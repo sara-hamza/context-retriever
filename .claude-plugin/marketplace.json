@@ -1,5 +1,6 @@
 {
   "name": "context-retriever",
+  "description": "Local vector retrieval for Claude Code: benchmarked semantic code search, session memory, and token-savings accounting — fully on-device.",
   "owner": {
     "name": "Hamza Abid",
     "url": "https://github.com/sara-hamza"
