@@ -1,6 +1,6 @@
 {
   "name": "context-retriever-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Local vector retrieval MCP server for coding agents: semantic code search, session-transcript memory, and a live token-savings counter. 100% on-device.",
   "license": "MIT",
   "author": "Hamza Abid",

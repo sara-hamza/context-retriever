@@ -159,7 +159,23 @@ export function createServer(): McpServer {
         lastRefresh.set("memory-extract", Date.now());
       }
       const report = memoryReport;
-      const store = await getFreshIndex(MEMORY_DIR);
+      // Not every surface has Claude Code session history (a fresh machine,
+      // or a host that stores sessions elsewhere). Degrade to a clear
+      // explanation instead of an error.
+      let store: StoreData;
+      try {
+        store = await getFreshIndex(MEMORY_DIR);
+      } catch {
+        return {
+          content: [{
+            type: "text" as const,
+            text:
+              "No session transcripts are available on this machine (looked in ~/.claude/projects). " +
+              "Transcript memory requires Claude Code session history and becomes available automatically " +
+              "once past sessions exist. Code search via search_context works independently of this.",
+          }],
+        };
+      }
       let hits = await search(store, query, k + 15);
       if (days !== undefined) hits = filterByDays(hits, days);
       hits = hits.slice(0, k);
