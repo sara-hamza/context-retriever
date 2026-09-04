@@ -1,0 +1,14 @@
+{
+  "name": "context-retriever",
+  "displayName": "Context Retriever",
+  "description": "Local vector retrieval: semantic code search, session-transcript memory, and a live token-savings counter. 100% on-device — benchmarked at 88% hit@5 (code) and 82% (memory), 3.4-36x token reduction.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Hamza Abid",
+    "url": "https://github.com/sara-hamza"
+  },
+  "homepage": "https://github.com/sara-hamza/context-retriever",
+  "repository": "https://github.com/sara-hamza/context-retriever",
+  "license": "MIT",
+  "keywords": ["retrieval", "rag", "semantic-search", "memory", "local-first", "token-savings"]
+}
