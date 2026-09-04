@@ -31,17 +31,21 @@ as a worked example of the method and freeze your own set for your repo.)
 
 ## Install
 
-**As a Claude Code plugin (easiest)** — inside any Claude Code session:
+**One-liner (recommended)** — registers the [npm package](https://www.npmjs.com/package/context-retriever-mcp)
+as an MCP server available in every project:
+
+```bash
+claude mcp add context-retriever -s user -- npx -y context-retriever-mcp
+```
+
+**As a Claude Code plugin** — inside any Claude Code session:
 
 ```
 /plugin marketplace add sara-hamza/context-retriever
 /plugin install context-retriever@context-retriever
 ```
 
-First launch installs dependencies automatically (~30s); everything after
-that is instant and fully local.
-
-**Or as a plain MCP server:**
+**From source:**
 
 ```bash
 git clone https://github.com/sara-hamza/context-retriever.git

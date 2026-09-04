@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "context-retriever": {
-      "command": "bash",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/start.sh"]
+      "command": "npx",
+      "args": ["-y", "context-retriever-mcp"]
     }
   }
 }
