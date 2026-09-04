@@ -31,16 +31,22 @@ as a worked example of the method and freeze your own set for your repo.)
 
 ## Install
 
-```bash
-git clone https://github.com/sara-hamza/context-retriever.git
-cd context-retriever
-npm install
+**As a Claude Code plugin (easiest)** — inside any Claude Code session:
+
+```
+/plugin marketplace add sara-hamza/context-retriever
+/plugin install context-retriever@context-retriever
 ```
 
-Register with Claude Code (available in every project):
+First launch installs dependencies automatically (~30s); everything after
+that is instant and fully local.
+
+**Or as a plain MCP server:**
 
 ```bash
-claude mcp add context-retriever -s user -- npx tsx /path/to/context-retriever/src/index.ts
+git clone https://github.com/sara-hamza/context-retriever.git
+cd context-retriever && npm install
+claude mcp add context-retriever -s user -- npx tsx "$(pwd)/src/index.ts"
 ```
 
 Optional but recommended — add to your `~/.claude/CLAUDE.md` so sessions use it
