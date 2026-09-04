@@ -16,7 +16,8 @@
   "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "test": "vitest run",
     "serve": "tsx src/index.ts",
     "cli": "tsx src/cli.ts",
