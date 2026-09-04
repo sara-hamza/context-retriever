@@ -1,0 +1,29 @@
+{
+  "comment": "Retrieval eval for the ROOO Ai monorepo. Each query lists the files that count as a correct top-5 hit (prefix match, relative to the indexed root). Frozen before the v2 changes; every ranking change must be measured against this set.",
+  "queries": [
+    { "query": "how does the agent loop execute tool calls", "expect": ["packages/agent-engine/src/loop/agent-loop.ts"] },
+    { "query": "where is conversation compaction implemented", "expect": ["packages/agent-engine/src/loop/compaction.ts"] },
+    { "query": "how is the system prompt constructed", "expect": ["packages/agent-engine/src/loop/system-prompt.ts"] },
+    { "query": "OAuth PKCE authentication flow", "expect": ["packages/agent-engine/src/auth/oauth-pkce.ts", "packages/agent-engine/src/auth/gateway-session.ts"] },
+    { "query": "how are shell command permissions analyzed before running", "expect": ["packages/agent-engine/src/permissions/command-analysis.ts", "packages/agent-engine/src/permissions/engine.ts"] },
+    { "query": "MCP client and tool integration", "expect": ["packages/agent-engine/src/mcp/client.ts", "packages/agent-engine/src/mcp/tools.ts"] },
+    { "query": "checkpoint snapshots using a shadow git repository", "expect": ["packages/agent-engine/src/checkpoints/shadow-git.ts"] },
+    { "query": "unified diff generation for file edits", "expect": ["packages/agent-engine/src/diff/unified-diff.ts"] },
+    { "query": "how is the electron main window created", "expect": ["packages/app/src/main/index.ts"] },
+    { "query": "IPC routing between main process and renderer", "expect": ["packages/app/src/main/ipc/router.ts", "packages/app/src/main/ipc/handlers.ts", "packages/shared/src/ipc/contract.ts"] },
+    { "query": "terminal emulator service with pty", "expect": ["packages/app/src/main/services/terminal.service.ts"] },
+    { "query": "git worktree management service", "expect": ["packages/app/src/main/services/worktree.service.ts"] },
+    { "query": "secret scanning and redaction of credentials", "expect": ["packages/shared/src/security/secret-scan.ts"] },
+    { "query": "chat state store in the renderer", "expect": ["packages/app/src/renderer/src/stores/chat.ts"] },
+    { "query": "monaco editor configuration", "expect": ["packages/app/src/renderer/src/lib/monaco-setup.ts"] },
+    { "query": "where are rotary position embeddings implemented", "expect": ["packages/quantum-llm/src/gen2.ts"] },
+    { "query": "Welch t test and one sample statistics", "expect": ["packages/quantum-llm/src/stats.ts"] },
+    { "query": "how does phase superposition pack tokens into one attention position", "expect": ["packages/quantum-llm/src/pack.ts"] },
+    { "query": "40 seed paired entropy experiment with registered decision rule", "expect": ["packages/quantum-llm/src/p6.ts", "packages/quantum-llm/src/p8.ts"] },
+    { "query": "character corpus encoding and train validation split", "expect": ["packages/quantum-llm/src/data.ts"] },
+    { "query": "hashed tf-idf embedding vectors", "expect": ["packages/context-retriever/src/embed.ts"] },
+    { "query": "token savings counter for retrieval", "expect": ["packages/context-retriever/src/store.ts", "packages/context-retriever/src/server.ts"] },
+    { "query": "deploy service for publishing projects", "expect": ["packages/app/src/main/services/deploy.service.ts"] },
+    { "query": "model registry and provider catalog", "expect": ["packages/app/src/main/services/model-registry.service.ts", "packages/shared/src/types/provider-catalog.ts", "packages/shared/src/types/model-registry.ts"] }
+  ]
+}

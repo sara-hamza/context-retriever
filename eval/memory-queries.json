@@ -1,0 +1,7 @@
+{
+  "comment": "TEMPLATE. Memory benchmarks are inherently personal — they name your own sessions — so the authors' real query set is not published. Freeze your own: pick ~10 questions you know the answer to, find the extracted session file(s) in ~/.rooo-context-retriever/memory/ that contain each answer, and list their filename prefixes under expect. Then run: npx tsx src/run010.ts. Our frozen set scored: best-chunk cosine 9/11 (82%) MRR 0.545; ACT-R recency decay tied or worse; query-blind newest-first 2/11.",
+  "queries": [
+    { "query": "what did we decide about the caching strategy", "expect": ["2026-01-15__your-project__abcd1234"] },
+    { "query": "the deploy failed because of a missing environment variable", "expect": ["2026-01-20__your-project__ef567890"] }
+  ]
+}

@@ -1,0 +1,215 @@
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+import { buildIndex, loadIndex, savingsFor, search, type StoreData } from "./store.js";
+import { extractTranscripts, filterByDays, MEMORY_DIR } from "./memory.js";
+
+/**
+ * MCP server: local vector retrieval so the model pulls the few relevant
+ * chunks instead of reading whole files. The token-savings counter is the
+ * point of the exercise — it makes the reduction measurable, not vibes.
+ * Lifetime totals persist across sessions in ~/.rooo-context-retriever/.
+ */
+interface SessionStats {
+  searches: number;
+  chunkTokens: number;
+  fullFileTokens: number;
+}
+
+const STATS_FILE = path.join(os.homedir(), ".rooo-context-retriever", "stats.json");
+
+async function loadLifetime(): Promise<SessionStats> {
+  try {
+    return JSON.parse(await fs.readFile(STATS_FILE, "utf8")) as SessionStats;
+  } catch {
+    return { searches: 0, chunkTokens: 0, fullFileTokens: 0 };
+  }
+}
+
+async function saveLifetime(stats: SessionStats): Promise<void> {
+  try {
+    await fs.mkdir(path.dirname(STATS_FILE), { recursive: true });
+    await fs.writeFile(STATS_FILE, JSON.stringify(stats));
+  } catch {
+    // Stats are a convenience — never let them break a search.
+  }
+}
+
+function report(label: string, s: SessionStats): string {
+  const saved = s.fullFileTokens - s.chunkTokens;
+  const ratio = s.chunkTokens > 0 ? `${(s.fullFileTokens / s.chunkTokens).toFixed(1)}×` : "—";
+  return (
+    `${label}: ${s.searches} searches | chunks ${s.chunkTokens.toLocaleString()} tokens ` +
+    `vs whole files ${s.fullFileTokens.toLocaleString()} | saved ~${saved.toLocaleString()} (${ratio})`
+  );
+}
+
+export function createServer(): McpServer {
+  const server = new McpServer({ name: "context-retriever", version: "0.1.0" });
+  const indexes = new Map<string, StoreData>();
+  const stats: SessionStats = { searches: 0, chunkTokens: 0, fullFileTokens: 0 };
+
+  async function getIndex(root: string, rebuild = false, full = false): Promise<StoreData> {
+    const cached = indexes.get(root);
+    if (cached && !rebuild) return cached;
+    const loaded = rebuild ? null : await loadIndex(root);
+    const store = loaded ?? (await buildIndex(root, { full }));
+    indexes.set(root, store);
+    return store;
+  }
+
+  /** Staleness guard: before a search, incrementally refresh the index so
+   * results never describe yesterday's code. buildIndex's identical-corpus
+   * fast path makes the no-change case cheap; the throttle keeps rapid
+   * successive searches from re-hashing the tree every time. */
+  const REFRESH_MS = 30_000;
+  const lastRefresh = new Map<string, number>();
+  let memoryReport = { scanned: 0, extracted: 0, upToDate: 0 };
+  async function getFreshIndex(root: string): Promise<StoreData> {
+    const now = Date.now();
+    const cached = indexes.get(root);
+    if (cached && now - (lastRefresh.get(root) ?? 0) < REFRESH_MS) return cached;
+    const store = await buildIndex(root, {});
+    indexes.set(root, store);
+    lastRefresh.set(root, now);
+    return store;
+  }
+
+  server.tool(
+    "index_path",
+    "Index (or re-index) a directory for vector retrieval. Incremental: only changed files are re-embedded. Run once per project, and again after changes.",
+    {
+      path: z.string().describe("Absolute path of the directory to index"),
+      full: z.boolean().default(false).describe("Force a full re-embed instead of incremental"),
+    },
+    async ({ path: root, full }) => {
+      const store = await getIndex(root, true, full);
+      const totalTokens = Object.values(store.fileTokens).reduce((a, b) => a + b, 0);
+      return {
+        content: [{
+          type: "text" as const,
+          text:
+            `Indexed ${store.root}: ${store.files} files, ${store.chunks.length} chunks, ` +
+            `~${totalTokens.toLocaleString()} tokens of source (${store.embedderKind} embeddings). ` +
+            `Use search_context instead of reading whole files.`,
+        }],
+      };
+    },
+  );
+
+  server.tool(
+    "search_context",
+    "Vector-search an indexed directory and return only the most relevant chunks (with file:line refs). " +
+      "Use this INSTEAD of reading whole files when you need context about the codebase.",
+    {
+      path: z.string().describe("Absolute path of the indexed directory"),
+      query: z.string().describe("What you are looking for, in natural language or identifiers"),
+      k: z.number().int().min(1).max(20).default(5).describe("Number of chunks to return"),
+    },
+    async ({ path: root, query, k }) => {
+      const store = await getFreshIndex(root);
+      const hits = await search(store, query, k);
+      const { chunkTokens, fullFileTokens } = savingsFor(store, hits);
+      stats.searches += 1;
+      stats.chunkTokens += chunkTokens;
+      stats.fullFileTokens += fullFileTokens;
+      const lifetime = await loadLifetime();
+      lifetime.searches += 1;
+      lifetime.chunkTokens += chunkTokens;
+      lifetime.fullFileTokens += fullFileTokens;
+      await saveLifetime(lifetime);
+
+      const body = hits
+        .map(
+          (h) =>
+            `=== ${h.file}:${h.startLine}-${h.endLine} (score ${h.score.toFixed(3)}) ===\n${h.text}`,
+        )
+        .join("\n\n");
+      const saved = fullFileTokens - chunkTokens;
+      return {
+        content: [{
+          type: "text" as const,
+          text:
+            `${body}\n\n` +
+            `--- retrieval: ${chunkTokens} tokens returned vs ~${fullFileTokens} to inline the ` +
+            `${new Set(hits.map((h) => h.file)).size} source file(s) (saved ~${saved}) ---`,
+        }],
+      };
+    },
+  );
+
+  server.tool(
+    "search_memory",
+    "Search past Claude Code session transcripts on this machine — use for questions like " +
+      "\"what did we decide about X?\" or \"what happened in the session where Y?\" instead of asking the user " +
+      "to re-explain. Local only. First call may take minutes while history is indexed.",
+    {
+      query: z.string().describe("What you are trying to remember, in natural language"),
+      k: z.number().int().min(1).max(20).default(5).describe("Number of transcript chunks to return"),
+      days: z.number().int().min(1).optional().describe("Only search sessions from the last N days"),
+    },
+    async ({ query, k, days }) => {
+      // Extraction shares the refresh throttle: scanning ~2k transcript
+      // stats every single memory query would be waste.
+      if (Date.now() - (lastRefresh.get("memory-extract") ?? 0) >= REFRESH_MS) {
+        memoryReport = await extractTranscripts();
+        lastRefresh.set("memory-extract", Date.now());
+      }
+      const report = memoryReport;
+      const store = await getFreshIndex(MEMORY_DIR);
+      let hits = await search(store, query, k + 15);
+      if (days !== undefined) hits = filterByDays(hits, days);
+      hits = hits.slice(0, k);
+      const { chunkTokens, fullFileTokens } = savingsFor(store, hits);
+      stats.searches += 1;
+      stats.chunkTokens += chunkTokens;
+      stats.fullFileTokens += fullFileTokens;
+      const lifetime = await loadLifetime();
+      lifetime.searches += 1;
+      lifetime.chunkTokens += chunkTokens;
+      lifetime.fullFileTokens += fullFileTokens;
+      await saveLifetime(lifetime);
+
+      const body = hits
+        .map(
+          (h) =>
+            `=== ${h.file.replace(/\.md$/, "")} lines ${h.startLine}-${h.endLine} (score ${h.score.toFixed(3)}) ===\n${h.text}`,
+        )
+        .join("\n\n");
+      return {
+        content: [{
+          type: "text" as const,
+          text:
+            `${body}\n\n` +
+            `--- memory: ${report.scanned} sessions known, ${hits.length} chunks returned ` +
+            `(${chunkTokens} tokens vs ~${fullFileTokens} to inline the sessions, saved ~${fullFileTokens - chunkTokens}) ---`,
+        }],
+      };
+    },
+  );
+
+  server.tool(
+    "retrieval_stats",
+    "Token-savings report: this session and the lifetime total across all sessions.",
+    {},
+    async () => {
+      const lifetime = await loadLifetime();
+      return {
+        content: [{
+          type: "text" as const,
+          text: `${report("this session", stats)}\n${report("lifetime", lifetime)}`,
+        }],
+      };
+    },
+  );
+
+  return server;
+}
+
+export async function serveStdio(): Promise<void> {
+  const server = createServer();
+  await server.connect(new StdioServerTransport());
+}
