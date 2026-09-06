@@ -75,13 +75,17 @@ enough. retrieval_stats shows what this saves.
 - **`index_path { path, full? }`** — index a directory. Incremental: only files
   whose content hash changed are re-embedded. First index of a mid-size repo
   takes about a minute; after that ~2s.
-- **`search_context { path, query, k? }`** — semantic search over an indexed
-  directory; returns top-k chunks with `file:line` references and a per-call
-  token comparison vs inlining the files.
+- **`search_context { path, query, k? }`** — semantic search; returns top-k chunks
+  with `file:line` references and a per-call token comparison vs inlining the
+  files. Indexes the directory automatically on first use. Works for
+  exploration ("where is X?") **and debugging** — pass an error message or
+  stack-trace frame as the query to land on the code that produced it.
 - **`search_memory { query, k?, days? }`** — semantic search over your past
   Claude Code session transcripts (extracted from `~/.claude/projects/`,
   message text only, tool noise skipped). `days` limits how far back to look.
-- **`retrieval_stats {}`** — tokens saved: this session and lifetime.
+- **`retrieval_stats {}`** — tokens saved (session + lifetime) **and health**: which
+  projects are indexed, how fresh, and with which embedder. Check this before
+  concluding retrieval is not helping.
 
 ## How it works
 

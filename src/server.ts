@@ -38,6 +38,58 @@ async function saveLifetime(stats: SessionStats): Promise<void> {
   }
 }
 
+/**
+ * Health section of retrieval_stats. Added in v1.1.0 after a day lost to
+ * "is it even working?": the plugin was connected but the project was
+ * unindexed, so every answer fell back to reading whole files. Reading the
+ * index directory answers that in one call instead of an investigation.
+ */
+async function healthReport(): Promise<string> {
+  const dir = path.dirname(STATS_FILE);
+  let entries: string[];
+  try {
+    entries = await fs.readdir(dir);
+  } catch {
+    return "indexed projects: none yet — search_context indexes a directory on first use.";
+  }
+  const live: { line: string; builtAt: number }[] = [];
+  let stale = 0;
+  for (const entry of entries) {
+    if (!entry.endsWith(".json") || entry === "stats.json") continue;
+    try {
+      const raw = await fs.readFile(path.join(dir, entry), "utf8");
+      const store = JSON.parse(raw) as {
+        root: string; files: number; chunks: unknown[]; embedderKind?: string; builtAt: string;
+      };
+      // An index whose project directory is gone (deleted repo, temp dir from
+      // a test run) is noise in a health report — count it, don't list it.
+      try {
+        await fs.stat(store.root);
+      } catch {
+        stale++;
+        continue;
+      }
+      const builtAt = Date.parse(store.builtAt);
+      const ageHours = (Date.now() - builtAt) / 3_600_000;
+      const age = ageHours < 1 ? `${Math.round(ageHours * 60)}m` : `${Math.round(ageHours)}h`;
+      live.push({
+        builtAt,
+        line:
+          `  ${store.root} — ${store.files} files, ${store.chunks.length} chunks, ` +
+          `${store.embedderKind ?? "unknown embedder"}, indexed ${age} ago`,
+      });
+    } catch {
+      stale++; // unreadable/corrupt — rebuilt automatically on next search
+    }
+  }
+  if (live.length === 0) {
+    return "indexed projects: none yet — search_context indexes a directory on first use.";
+  }
+  live.sort((a, b) => b.builtAt - a.builtAt); // freshest first
+  const staleNote = stale > 0 ? ` (${stale} stale index file${stale === 1 ? "" : "s"} ignored)` : "";
+  return `indexed projects (${live.length})${staleNote}:\n${live.map((r) => r.line).join("\n")}`;
+}
+
 function report(label: string, s: SessionStats): string {
   const saved = s.fullFileTokens - s.chunkTokens;
   const ratio = s.chunkTokens > 0 ? `${(s.fullFileTokens / s.chunkTokens).toFixed(1)}×` : "—";
@@ -102,15 +154,35 @@ export function createServer(): McpServer {
 
   server.tool(
     "search_context",
-    "Vector-search an indexed directory and return only the most relevant chunks (with file:line refs). " +
-      "Use this INSTEAD of reading whole files when you need context about the codebase.",
+    "Vector-search a codebase and return only the most relevant chunks (with file:line refs), " +
+      "instead of reading whole files. Indexes the directory automatically on first use. Use it for:\n" +
+      "• \"where is X?\", \"how does Y work?\", \"what calls Z?\" — before reading or grepping\n" +
+      "• DEBUGGING: paste the failing symbol, error message, or stack-trace frame as the query " +
+      "(e.g. \"RideDetailScreen null check ride history\") to jump straight to the code that produced it\n" +
+      "• orienting in unfamiliar packages, or code you have not touched recently",
     {
-      path: z.string().describe("Absolute path of the indexed directory"),
-      query: z.string().describe("What you are looking for, in natural language or identifiers"),
+      path: z.string().describe("Absolute path of the project directory (indexed on demand)"),
+      query: z
+        .string()
+        .describe(
+          "What you are looking for: natural language, identifiers, an error message, or a stack-trace frame",
+        ),
       k: z.number().int().min(1).max(20).default(5).describe("Number of chunks to return"),
     },
     async ({ path: root, query, k }) => {
-      const store = await getFreshIndex(root);
+      let store: StoreData;
+      try {
+        store = await getFreshIndex(root);
+      } catch (error) {
+        return {
+          content: [{
+            type: "text" as const,
+            text:
+              `Could not index ${root}: ${String(error).slice(0, 200)}\n` +
+              `Check the path exists and contains source files.`,
+          }],
+        };
+      }
       const hits = await search(store, query, k);
       const { chunkTokens, fullFileTokens } = savingsFor(store, hits);
       stats.searches += 1;
@@ -209,14 +281,18 @@ export function createServer(): McpServer {
 
   server.tool(
     "retrieval_stats",
-    "Token-savings report: this session and the lifetime total across all sessions.",
+    "Token savings (this session and lifetime) plus health: which projects are indexed, " +
+      "how fresh each index is, and which embedder built it. Use it to check whether " +
+      "retrieval is actually working before concluding it is not helping.",
     {},
     async () => {
       const lifetime = await loadLifetime();
       return {
         content: [{
           type: "text" as const,
-          text: `${report("this session", stats)}\n${report("lifetime", lifetime)}`,
+          text:
+            `${report("this session", stats)}\n${report("lifetime", lifetime)}\n\n` +
+            (await healthReport()),
         }],
       };
     },
