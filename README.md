@@ -63,11 +63,13 @@ Optional but recommended — add to your `~/.claude/CLAUDE.md` so sessions use i
 by default:
 
 ```markdown
-When the context-retriever MCP tools are available and you need to understand
-code — "where is X?", "how does Y work?" — call search_context FIRST, before
-reading whole files. For "what did we decide?" questions, call search_memory.
-Read a full file only when you are about to edit it or the chunks are not
-enough. retrieval_stats shows what this saves.
+The context-retriever tools are often DEFERRED (listed by name, schema not
+loaded). Load them once at session start:
+  ToolSearch "select:mcp__context-retriever__search_context,mcp__context-retriever__search_memory,mcp__context-retriever__index_path,mcp__context-retriever__retrieval_stats"
+Then, for "where is X?" / "how does Y work?", call search_context BEFORE
+reading whole files. When debugging, search the error text or failing symbol.
+For "what did we decide?", call search_memory. Read a full file only when
+about to edit it. retrieval_stats shows savings and index health.
 ```
 
 ## Tools
@@ -115,7 +117,7 @@ anywhere, ever.
 ## Development
 
 ```bash
-npm test          # 12 unit tests
+npm test          # 32 unit tests
 npm run typecheck
 npx tsx src/cli.ts index /path/to/repo          # try it without an MCP client
 npx tsx src/cli.ts search /path/to/repo "where is the retry logic"
