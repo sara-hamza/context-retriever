@@ -31,11 +31,17 @@ as a worked example of the method and freeze your own set for your repo.)
 
 ## Install
 
-**One-liner (recommended)** — registers the [npm package](https://www.npmjs.com/package/context-retriever-mcp)
-as an MCP server available in every project:
+**Recommended** — install once, then register the binary. This matters:
+launching via `npx` re-resolves ~100MB of model dependencies on a cold
+cache, which takes longer than the 30-second MCP startup timeout and shows
+up as "failed to connect". Installing first makes startup ~3 seconds.
 
 ```bash
-claude mcp add context-retriever -s user -- npx -y context-retriever-mcp
+npm install -g context-retriever-mcp
+```
+
+```bash
+claude mcp add context-retriever -s user -- context-retriever
 ```
 
 **As a Claude Code plugin** — inside any Claude Code session:
