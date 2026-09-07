@@ -1,6 +1,6 @@
 {
   "name": "context-retriever-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Local vector retrieval MCP server for coding agents: semantic code search, session-transcript memory, and a live token-savings counter. 100% on-device.",
   "license": "MIT",
   "author": "Hamza Abid",
@@ -8,12 +8,25 @@
     "type": "git",
     "url": "https://github.com/sara-hamza/context-retriever.git"
   },
-  "keywords": ["mcp", "retrieval", "rag", "claude-code", "semantic-search", "embeddings", "local-first"],
+  "keywords": [
+    "mcp",
+    "retrieval",
+    "rag",
+    "claude-code",
+    "semantic-search",
+    "embeddings",
+    "local-first"
+  ],
   "type": "module",
   "bin": {
-    "context-retriever": "dist/index.js"
+    "context-retriever": "dist/index.js",
+    "crs": "dist/cli.js"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
