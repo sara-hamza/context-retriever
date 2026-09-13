@@ -66,14 +66,21 @@ Optional but recommended — add to your `~/.claude/CLAUDE.md` so sessions use i
 by default:
 
 ```markdown
-The context-retriever tools are often DEFERRED (listed by name, schema not
-loaded). Load them once at session start:
-  ToolSearch "select:mcp__context-retriever__search_context,mcp__context-retriever__search_memory,mcp__context-retriever__index_path,mcp__context-retriever__retrieval_stats"
-Then, for "where is X?" / "how does Y work?", call search_context BEFORE
-reading whole files. When debugging, search the error text or failing symbol.
-For "what did we decide?", call search_memory. Read a full file only when
-about to edit it. retrieval_stats shows savings and index health.
+Before reading whole files to understand code, search first — with Bash:
+    crs "<what you are looking for>"     # searches the working directory
+    crs /path/to/project "<query>"       # searches a specific project
+    crs memory "<query>"                 # searches past Claude Code sessions
+Use it for "where is X?" / "how does Y work?" BEFORE Read or Grep, and when
+debugging search the error text or failing symbol. Read a full file only when
+about to edit it. `crs stats` shows lifetime tokens saved.
 ```
+
+The `crs` command exists because on a machine with many MCP servers these
+tools are often *deferred* — listed by name with their schema unloaded — and
+go unused. Measured across five large real sessions: the agent called
+ToolSearch 5-6 times each and loaded these tools zero times, while calling
+Bash over a thousand times. A shell command rides a path the agent already
+uses; the MCP tools remain available and identical.
 
 ## Tools
 
