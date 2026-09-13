@@ -31,14 +31,17 @@ as a worked example of the method and freeze your own set for your repo.)
 
 ## Install
 
-**Recommended** — install once, then register the binary. This matters:
-launching via `npx` re-resolves ~100MB of model dependencies on a cold
-cache, which takes longer than the 30-second MCP startup timeout and shows
-up as "failed to connect". Installing first makes startup ~3 seconds.
+**Recommended** — install once, then register the binary:
 
 ```bash
-npm install -g context-retriever-mcp
+npm install -g context-retriever-mcp @huggingface/transformers
 ```
+
+The second package is the embedding model runtime. It is optional: without
+it the server still works using a deterministic lexical embedder (83% vs 88%
+hit@5 on our benchmark), and it is deliberately *not* a hard dependency so a
+cold `npx` start stays under a second instead of downloading ~100MB and
+blowing the 30-second MCP startup timeout.
 
 ```bash
 claude mcp add context-retriever -s user -- context-retriever
@@ -93,9 +96,12 @@ about to edit it. retrieval_stats shows savings and index health.
 
 1. Files are chunked at declaration/heading boundaries (functions stay whole;
    measured +5 points hit@5 over fixed windows), embedded with
-   all-MiniLM-L6-v2 via transformers.js (~25MB one-time model download, fully
-   local afterwards; deterministic hashed TF-IDF fallback when the model can't
-   load), and stored under `~/.rooo-context-retriever/`.
+   all-MiniLM-L6-v2 via transformers.js when `@huggingface/transformers` is
+   installed (~25MB one-time model download, fully local afterwards), and
+   stored under `~/.rooo-context-retriever/`. Without that package a
+   deterministic hashed TF-IDF embedder is used instead; an index built with
+   one embedder is rebuilt automatically if the other is all that is
+   available, so search never fails because of a missing model.
 2. Queries embed the same way; chunks rank by cosine similarity, with a mild
    penalty on test/spec paths so implementation outranks its tests.
 3. Before every search, a staleness guard re-hashes the corpus and

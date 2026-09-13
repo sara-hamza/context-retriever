@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { chunkText, estimateTokens, readCorpus, type Chunk } from "./chunk.js";
-import { cosine, TfIdfHashEmbedder, type EmbedderState } from "./embed.js";
+import { cosine, TfIdfHashEmbedder, type Embedder, type EmbedderState } from "./embed.js";
 import { createEmbedder, NeuralEmbedder } from "./neural.js";
 
 export interface IndexedChunk extends Chunk {
@@ -178,10 +178,29 @@ export async function search(store: StoreData, query: string, k: number): Promis
     store.lexicalState !== null &&
     process.env["CONTEXT_RETRIEVER_RANK"] === "hybrid";
 
-  const semantic =
-    store.embedderKind === "neural"
-      ? new NeuralEmbedder()
-      : new TfIdfHashEmbedder(store.lexicalState?.dimensions ?? 512, store.lexicalState ?? undefined);
+  let semantic: Embedder;
+  if (store.embedderKind === "neural") {
+    const neural = new NeuralEmbedder();
+    try {
+      await neural.embedBatch(["probe"]);
+      semantic = neural;
+    } catch {
+      // The index was built with neural embeddings but the model library is
+      // not installed here. Neural vectors cannot be queried lexically, so
+      // rebuild the index in the embedder we actually have, once.
+      console.error(
+        "context-retriever: neural model unavailable — rebuilding this index with the lexical embedder. " +
+          "For higher-quality search install it: npm i -g @huggingface/transformers",
+      );
+      const rebuilt = await buildIndex(store.root, { full: true });
+      return search(rebuilt, query, k);
+    }
+  } else {
+    semantic = new TfIdfHashEmbedder(
+      store.lexicalState?.dimensions ?? 512,
+      store.lexicalState ?? undefined,
+    );
+  }
   const [semanticQuery] = await semantic.embedBatch([query]);
   const semanticScores = store.chunks.map((chunk) =>
     cosine(semanticQuery as Float32Array, Float32Array.from(chunk.vector)),

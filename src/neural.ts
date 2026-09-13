@@ -70,7 +70,11 @@ export async function createEmbedder(
       await embedder.embedBatch(["warm-up"]);
       return embedder;
     } catch (error) {
-      console.error(`neural embedder unavailable, using lexical fallback: ${String(error)}`);
+      console.error(
+        "context-retriever: neural model unavailable, using the lexical embedder " +
+          "(install for better search: npm i -g @huggingface/transformers). " +
+          `reason: ${String(error).slice(0, 120)}`,
+      );
     }
   }
   return new TfIdfHashEmbedder(restored?.dimensions ?? 512, restored ?? undefined);
